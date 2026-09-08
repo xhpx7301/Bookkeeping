@@ -26,6 +26,12 @@
 在 Debian 上执行：
 
 ```bash
+bash -lc 'git clone https://github.com/xhpx7301/Bookkeeping.git /opt/bookkeeping && cd /opt/bookkeeping && bash install.sh'
+```
+
+如果你已经把代码放到本地目录，也可以直接执行：
+
+```bash
 bash install.sh
 ```
 
