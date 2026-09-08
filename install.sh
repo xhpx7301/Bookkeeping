@@ -6,6 +6,7 @@ TARGET_DIR="/opt/bookkeeping"
 REPO_URL="https://github.com/xhpx7301/Bookkeeping"
 MISSING=()
 REMOTE_BRANCH="main"
+BK_LINK="/usr/local/bin/bk"
 
 SUDO=""
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
@@ -73,6 +74,7 @@ sync_project() {
     rsync -a --exclude '.git' --exclude '.env' --exclude 'data' --exclude 'backups' "$SOURCE_DIR"/ "$TARGET_DIR"/
   fi
   $SUDO chmod +x "$TARGET_DIR/bk" "$TARGET_DIR/install.sh"
+  $SUDO ln -sf "$TARGET_DIR/bk" "$BK_LINK"
 }
 
 main() {
