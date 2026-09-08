@@ -26,7 +26,7 @@
 在 Debian 上执行：
 
 ```bash
-bash -lc 'git clone https://github.com/xhpx7301/Bookkeeping.git /opt/bookkeeping && cd /opt/bookkeeping && bash install.sh'
+bash -lc 'if [ -d /opt/bookkeeping/.git ]; then cd /opt/bookkeeping && git fetch origin main && git reset --hard origin/main; else git clone https://github.com/xhpx7301/Bookkeeping.git /opt/bookkeeping; fi && cd /opt/bookkeeping && bash install.sh'
 ```
 
 如果你已经把代码放到本地目录，也可以直接执行：

@@ -5,6 +5,7 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="/opt/bookkeeping"
 REPO_URL="https://github.com/xhpx7301/Bookkeeping"
 MISSING=()
+REMOTE_BRANCH="main"
 
 SUDO=""
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
@@ -59,7 +60,11 @@ install_docker() {
 
 sync_project() {
   $SUDO mkdir -p "$TARGET_DIR"
-  rsync -a --exclude '.git' --exclude '.env' --exclude 'data' --exclude 'backups' "$SOURCE_DIR"/ "$TARGET_DIR"/
+  if [[ -d "$TARGET_DIR/.git" ]]; then
+    (cd "$TARGET_DIR" && git fetch origin "$REMOTE_BRANCH" && git reset --hard "origin/$REMOTE_BRANCH")
+  else
+    rsync -a --exclude '.git' --exclude '.env' --exclude 'data' --exclude 'backups' "$SOURCE_DIR"/ "$TARGET_DIR"/
+  fi
   $SUDO chmod +x "$TARGET_DIR/bk" "$TARGET_DIR/install.sh"
 }
 
