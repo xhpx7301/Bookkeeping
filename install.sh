@@ -66,6 +66,7 @@ sync_project() {
   target_real="$(cd "$TARGET_DIR" && pwd -P)"
   if [[ "$source_real" == "$target_real" ]]; then
     $SUDO chmod +x "$TARGET_DIR/bk" "$TARGET_DIR/install.sh"
+    $SUDO ln -sf "$TARGET_DIR/bk" "$BK_LINK"
     return 0
   fi
   if [[ -d "$TARGET_DIR/.git" ]]; then
