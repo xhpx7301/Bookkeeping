@@ -60,6 +60,13 @@ install_docker() {
 
 sync_project() {
   $SUDO mkdir -p "$TARGET_DIR"
+  local source_real target_real
+  source_real="$(cd "$SOURCE_DIR" && pwd -P)"
+  target_real="$(cd "$TARGET_DIR" && pwd -P)"
+  if [[ "$source_real" == "$target_real" ]]; then
+    $SUDO chmod +x "$TARGET_DIR/bk" "$TARGET_DIR/install.sh"
+    return 0
+  fi
   if [[ -d "$TARGET_DIR/.git" ]]; then
     (cd "$TARGET_DIR" && git fetch origin "$REMOTE_BRANCH" && git reset --hard "origin/$REMOTE_BRANCH")
   else

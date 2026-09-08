@@ -26,7 +26,7 @@
 在 Debian 上执行：
 
 ```bash
-bash -lc 'if [ -d /opt/bookkeeping/.git ]; then cd /opt/bookkeeping && git fetch origin main && git reset --hard origin/main; else git clone https://github.com/xhpx7301/Bookkeeping.git /opt/bookkeeping; fi && cd /opt/bookkeeping && bash install.sh'
+bash -lc 'set -e; command -v git >/dev/null 2>&1 && command -v rsync >/dev/null 2>&1 || (apt-get update && apt-get install -y git rsync); mkdir -p /opt/bookkeeping; tmp=$(mktemp -d); git clone https://github.com/xhpx7301/Bookkeeping.git "$tmp/Bookkeeping"; rsync -a --delete --exclude .git --exclude .env --exclude data --exclude backups "$tmp/Bookkeeping/" /opt/bookkeeping/; cd /opt/bookkeeping; bash install.sh; rm -rf "$tmp"'
 ```
 
 如果你已经把代码放到本地目录，也可以直接执行：
