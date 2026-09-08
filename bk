@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APP_DIR="${BOOKKEEPING_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+ENV_FILE="$APP_DIR/.env"
+COMPOSE_FILE="$APP_DIR/docker-compose.yml"
+MANAGE_PY="$APP_DIR/manage.py"
+DB_PATH="${LOAN_DB_PATH:-$APP_DIR/data/bookkeeping.db}"
+
+load_env() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+}
+
+require_python() {
+  command -v python3 >/dev/null 2>&1 || { echo "未找到 python3。请先安装 Python 3。"; exit 1; }
+}
+
+require_docker() {
+  command -v docker >/dev/null 2>&1 || { echo "未找到 docker。请先运行 install.sh 安装 Docker。"; exit 1; }
+  docker compose version >/dev/null 2>&1 || { echo "未找到 Docker Compose 插件。"; exit 1; }
+}
+
+compose() {
+  docker compose -f "$COMPOSE_FILE" "$@"
+}
+
+confirm() {
+  local prompt="${1:-是否继续？}" answer
+  read -r -p "$prompt [Y/n] " answer
+  answer="${answer:-y}"
+  [[ "$answer" =~ ^[Yy]$ ]]
+}
+
+settings() {
+  require_python
+  local username password confirm_password password_b64 session_secret
+  read -r -p "登录用户名 [admin]：" username
+  username="${username:-admin}"
+  while true; do
+    read -r -s -p "登录密码（至少 6 位）：" password
+    echo
+    read -r -s -p "再次输入密码：" confirm_password
+    echo
+    [[ ${#password} -ge 6 ]] || { echo "密码至少需要 6 位。"; continue; }
+    [[ "$password" == "$confirm_password" ]] || { echo "两次输入的密码不一致。"; continue; }
+    break
+  done
+  password_b64="$(printf '%s' "$password" | python3 -c 'import base64,sys; print(base64.b64encode(sys.stdin.buffer.read()).decode("ascii"))')"
+  session_secret="$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(48))
+PY
+)"
+  umask 077
+  cat > "$ENV_FILE" <<EOF
+BOOTSTRAP_ADMIN_USERNAME=$username
+BOOTSTRAP_ADMIN_PASSWORD_B64=$password_b64
+SESSION_SECRET=$session_secret
+SESSION_TTL=604800
+COOKIE_SECURE=true
+EOF
+  chmod 600 "$ENV_FILE"
+  echo "登录配置已写入 $ENV_FILE"
+  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+    if compose ps --status running --quiet | grep -q .; then
+      compose up -d --force-recreate
+      echo "服务已重建，新账户立即生效。"
+    fi
+  fi
+}
+
+ensure_settings() {
+  [[ -s "$ENV_FILE" ]] || { echo "首次运行需要先设置登录账户。"; settings; }
+}
+
+run_manage() {
+  require_python
+  load_env
+  python3 "$MANAGE_PY" "$@"
+}
+
+backup() {
+  mkdir -p "$APP_DIR/backups"
+  local stamp source
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  source="${DB_PATH}"
+  if [[ -f "$source" ]]; then
+    cp "$source" "$APP_DIR/backups/bookkeeping-$stamp.db"
+    echo "备份完成：$APP_DIR/backups/bookkeeping-$stamp.db"
+  else
+    echo "暂时没有数据库文件。"
+  fi
+}
+
+upgrade() {
+  require_docker
+  ensure_settings
+  echo "正在重新构建 Bookkeeping 镜像并更新服务……"
+  compose build --pull
+  compose up -d
+  echo "升级完成。"
+}
+
+service_action() {
+  require_docker
+  ensure_settings
+  compose "$@"
+}
+
+print_users() {
+  run_manage users
+}
+
+user_add() {
+  local role="${1:-user}" username password
+  read -r -p "用户名：" username
+  read -r -s -p "密码：" password
+  echo
+  run_manage add-user --role "$role" --username "$username" --password "$password"
+}
+
+user_reset() {
+  local username password
+  read -r -p "用户名：" username
+  read -r -s -p "新密码：" password
+  echo
+  run_manage set-password "$username" --password "$password"
+}
+
+user_toggle() {
+  local username
+  read -r -p "用户名：" username
+  run_manage toggle-user "$username"
+}
+
+user_delete() {
+  local username
+  read -r -p "用户名：" username
+  run_manage delete-user "$username"
+}
+
+user_menu() {
+  while true; do
+    echo
+    echo "用户管理"
+    echo "1) 查看用户"
+    echo "2) 新建用户"
+    echo "3) 注册用户"
+    echo "4) 重置密码"
+    echo "5) 停用/启用用户"
+    echo "6) 删除用户"
+    echo "0) 返回"
+    read -r -p "请选择 [0-6]：" choice
+    case "$choice" in
+      1) print_users ;;
+      2) user_add admin ;;
+      3) user_add user ;;
+      4) user_reset ;;
+      5) user_toggle ;;
+      6) user_delete ;;
+      0) return 0 ;;
+      *) echo "无效选项。" ;;
+    esac
+  done
+}
+
+menu() {
+  while true; do
+    echo
+    echo "Bookkeeping 项目管理"
+    echo "目录：$APP_DIR"
+    echo "1) 查看状态"
+    echo "2) 启动服务"
+    echo "3) 停止服务"
+    echo "4) 重启服务"
+    echo "5) 升级/重新构建"
+    echo "6) 查看日志"
+    echo "7) 备份数据库"
+    echo "8) 设置/修改登录账户"
+    echo "9) 用户管理"
+    echo "0) 退出"
+    read -r -p "请选择 [0-9]：" choice
+    case "$choice" in
+      1) service_action ps ;;
+      2) service_action up -d ;;
+      3) service_action stop ;;
+      4) service_action restart ;;
+      5) upgrade ;;
+      6) service_action logs -f --tail=200 ;;
+      7) backup ;;
+      8) settings ;;
+      9) user_menu ;;
+      0) return 0 ;;
+      *) echo "无效选项。" ;;
+    esac
+  done
+}
+
+case "${1:-menu}" in
+  start) service_action up -d ;;
+  stop) service_action stop ;;
+  restart) service_action restart ;;
+  upgrade) upgrade ;;
+  status) service_action ps ;;
+  logs) service_action logs -f --tail=200 ;;
+  backup) backup ;;
+  settings) settings ;;
+  users) print_users ;;
+  user-add) shift; run_manage add-user "$@" ;;
+  register) shift; run_manage register "$@" ;;
+  user-password) shift; run_manage set-password "$@" ;;
+  user-toggle) shift; run_manage toggle-user "$@" ;;
+  user-delete) shift; run_manage delete-user "$@" ;;
+  install) "$APP_DIR/install.sh" ;;
+  menu|"") menu ;;
+  *) echo "用法：bk [start|stop|restart|upgrade|status|logs|backup|settings|users|user-add|register|user-password|user-toggle|user-delete]"; exit 2 ;;
+esac

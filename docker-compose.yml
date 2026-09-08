@@ -1,0 +1,16 @@
+name: bookkeeping
+
+services:
+  bookkeeping:
+    build: .
+    container_name: bookkeeping
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      COOKIE_SECURE: "true"
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "37037:8080"

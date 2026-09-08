@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bookkeeping · 分期台账</title>
+  <style>
+    :root { color-scheme: light; --ink:#17212b; --muted:#6b7785; --line:#dfe5eb; --panel:#fff; --bg:#f4f7fa; --blue:#2878d4; --blue-weak:#eaf3ff; --green:#0b8f68; --amber:#a66b00; --danger:#b42318; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    .app { min-height:100vh; }
+    .topbar { background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+    .topbar-inner { max-width:1180px; margin:auto; padding:18px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .brand { display:flex; align-items:center; gap:11px; }
+    .brand-mark { width:34px; height:34px; display:grid; place-items:center; background:var(--blue); color:#fff; border-radius:8px; font-weight:700; }
+    h1,h2,h3,p { margin:0; }
+    h1 { font-size:20px; letter-spacing:0; }
+    .subtitle { color:var(--muted); margin-top:2px; }
+    .actions { display:flex; gap:8px; }
+    .btn { border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:7px; padding:9px 13px; display:inline-flex; align-items:center; gap:7px; }
+    .btn:hover { border-color:#aebdca; background:#f8fafc; }
+    .btn.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+    .btn.primary:hover { background:#1766c0; }
+    .btn.danger { color:var(--danger); }
+    .btn.sm { padding:6px 9px; font-size:12px; }
+    .btn.ghost { background:#f8fafc; }
+    main { max-width:1180px; margin:auto; padding:24px; }
+    .layout { display:grid; grid-template-columns:320px minmax(0,1fr); gap:18px; align-items:start; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 9px rgba(23,33,43,.04); }
+    .panel-head { padding:17px 18px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .panel-head h2 { font-size:15px; }
+    .panel-body { padding:18px; }
+    .loan-list { display:grid; gap:8px; }
+    .loan-item { width:100%; text-align:left; border:1px solid var(--line); background:#fff; border-radius:7px; padding:12px; }
+    .loan-item.active { border-color:var(--blue); box-shadow:0 0 0 2px var(--blue-weak); }
+    .loan-item-title { display:flex; justify-content:space-between; gap:8px; font-weight:600; }
+    .loan-item-meta { color:var(--muted); font-size:12px; margin-top:4px; }
+    .empty { color:var(--muted); text-align:center; padding:25px 8px; }
+    .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .field { display:grid; gap:6px; }
+    .field.full { grid-column:1/-1; }
+    label { font-size:12px; color:var(--muted); }
+    input,select { width:100%; border:1px solid #cbd5df; border-radius:6px; padding:9px 10px; background:#fff; color:var(--ink); }
+    input:focus,select:focus { outline:2px solid var(--blue-weak); border-color:var(--blue); }
+    .help { color:var(--muted); font-size:12px; }
+    .form-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+    .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:18px; }
+    .metric { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px; }
+    .metric-label { color:var(--muted); font-size:12px; }
+    .metric-value { font-size:22px; font-weight:650; margin-top:5px; }
+    .metric-note { color:var(--muted); font-size:12px; margin-top:3px; }
+    .progress { height:6px; background:#e7edf2; border-radius:99px; overflow:hidden; margin-top:9px; }
+    .progress > span { height:100%; display:block; background:var(--green); }
+    .table-wrap { overflow:auto; }
+    table { width:100%; border-collapse:collapse; min-width:650px; }
+    th,td { padding:11px 14px; border-bottom:1px solid #edf0f3; text-align:right; white-space:nowrap; }
+    th:first-child,td:first-child { text-align:left; }
+    th { color:var(--muted); font-weight:500; font-size:12px; background:#fbfcfd; }
+    tr.paid td { color:#87939f; }
+    .status { display:inline-flex; align-items:center; gap:5px; font-size:12px; }
+    .dot { width:7px; height:7px; border-radius:50%; background:#c7d0d9; }
+    .status.paid { color:var(--green); } .status.paid .dot { background:var(--green); }
+    .status.next { color:var(--blue); } .status.next .dot { background:var(--blue); }
+    .status.future { color:var(--muted); }
+    .notice { padding:11px 13px; background:#f8fafc; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-size:12px; margin-top:14px; }
+    .bill-panel { margin-top:18px; }
+    .bill-total { font-weight:650; }
+    .dashboard { margin-bottom:18px; }
+    .month-toolbar { display:flex; align-items:center; gap:10px; }
+    .month-toolbar select { width:auto; min-width:150px; }
+    .month-total { font-size:20px; font-weight:650; }
+    .month-detail { color:var(--muted); font-size:12px; margin-top:3px; }
+    .overall-summary { grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:14px; margin-bottom:0; }
+    .overall-summary .metric { background:#fbfcfd; }
+    .history-head { margin:20px 0 9px; color:var(--muted); font-size:12px; }
+    .closed-badge { color:var(--green); font-size:12px; }
+    .auth-screen { min-height:100vh; display:grid; place-items:center; padding:20px; background:var(--bg); }
+    .auth-card { width:min(390px,100%); background:#fff; border:1px solid var(--line); border-radius:8px; padding:26px; box-shadow:0 5px 18px rgba(23,33,43,.07); }
+    .auth-card h1 { margin-bottom:5px; }
+    .auth-card .field { margin-top:15px; }
+    .auth-error { color:var(--danger); min-height:21px; margin-top:12px; font-size:12px; }
+    .auth-submit { width:100%; justify-content:center; margin-top:17px; }
+    .user-actions { display:flex; align-items:center; gap:10px; }
+    .user-name { color:var(--muted); font-size:12px; }
+    .section-title { font-size:15px; margin-bottom:13px; }
+    .inline-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
+    .admin-panel { margin-bottom:18px; }
+    .admin-meta { color:var(--muted); font-size:12px; }
+    .user-table td:last-child { min-width:250px; }
+    .hidden { display:none !important; }
+    @media (max-width:850px) { .layout { grid-template-columns:1fr; } .summary { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:520px) { .topbar-inner,main { padding-left:14px; padding-right:14px; } .topbar-inner { align-items:flex-start; } .actions .btn span { display:none; } .form-grid { grid-template-columns:1fr; } .field.full { grid-column:auto; } .summary { gap:8px; } .metric { padding:11px; } .metric-value { font-size:18px; } }
+  </style>
+</head>
+<body>
+  <div id="authScreen" class="auth-screen hidden">
+    <form id="loginForm" class="auth-card">
+      <h1>Bookkeeping</h1><p class="subtitle">登录后管理你的分期账单</p>
+      <div class="field"><label for="loginUsername">用户名</label><input id="loginUsername" autocomplete="username" required></div>
+      <div class="field"><label for="loginPassword">密码</label><input id="loginPassword" type="password" autocomplete="current-password" required></div>
+      <div id="authError" class="auth-error"></div><button class="btn primary auth-submit" type="submit">登录</button>
+    </form>
+  </div>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand"><div class="brand-mark">¥</div><div><h1>Bookkeeping</h1><p class="subtitle">分期台账 · 自动计算本金、利息与剩余还款</p></div></div>
+        <div class="actions"><span id="userName" class="user-name"></span><button class="btn hidden" id="manageUsersBtn">👥 <span>用户</span></button><button class="btn" id="logoutBtn">退出</button><button class="btn" id="importBtn" title="导入备份数据">⇧ <span>导入</span></button><input id="importFile" type="file" accept="application/json" class="hidden"><button class="btn" id="exportBtn" title="导出当前数据">⇩ <span>导出</span></button><button class="btn primary" id="newBtn">＋ <span>新增分期</span></button></div>
+      </div>
+    </header>
+    <main>
+      <div class="panel dashboard">
+        <div class="panel-head"><div><h2>月度还款</h2><p class="subtitle">合并所有未结清分期，查看每个月需要还多少、哪天还</p></div><div class="month-toolbar"><label for="monthSelect" class="help">查看月份</label><select id="monthSelect"></select></div></div>
+        <div class="panel-body"><div class="summary" id="monthSummary"></div><div class="summary overall-summary" id="overallSummary"></div><h3 class="section-title">按还款日汇总</h3><div class="table-wrap"><table><thead><tr><th>还款日</th><th>账单笔数</th><th>应还本金</th><th>利息/手续费</th><th>当天总额</th></tr></thead><tbody id="dayBody"></tbody></table></div><h3 class="section-title" style="margin-top:20px">逐笔明细</h3><div class="table-wrap"><table><thead><tr><th>贷款</th><th>还款时间</th><th>需还本金</th><th>利息/手续费</th><th>本期合计</th></tr></thead><tbody id="monthBody"></tbody></table></div><div id="monthEmpty" class="empty hidden">这个月没有待还账单</div></div>
+      </div>
+      <div id="adminPanel" class="panel admin-panel hidden">
+        <div class="panel-head">
+          <div><h2>用户管理</h2><p class="subtitle">管理员可在这里创建、停用、重置和删除用户</p></div>
+          <div class="actions"><button class="btn" id="refreshUsersBtn">刷新</button></div>
+        </div>
+        <div class="panel-body">
+          <form id="userForm">
+            <div class="form-grid">
+              <div class="field"><label for="newUsername">用户名</label><input id="newUsername" required placeholder="例如：alice"></div>
+              <div class="field"><label for="newPassword">密码</label><input id="newPassword" type="password" required placeholder="至少 6 位"></div>
+              <div class="field"><label for="newRole">角色</label><select id="newRole"><option value="user">普通用户</option><option value="admin">管理员</option></select></div>
+              <div class="field"><label>&nbsp;</label><button class="btn primary" type="submit">创建用户</button></div>
+            </div>
+          </form>
+          <div class="table-wrap" style="margin-top:14px">
+            <table class="user-table">
+              <thead><tr><th>用户名</th><th>角色</th><th>状态</th><th>账单数</th><th>创建时间</th><th>操作</th></tr></thead>
+              <tbody id="userBody"></tbody>
+            </table>
+          </div>
+          <div id="userEmpty" class="empty hidden">暂无用户</div>
+        </div>
+      </div>
+      <div class="layout">
+        <aside class="panel">
+          <div class="panel-head"><h2>我的分期</h2><span class="help" id="loanCount"></span></div>
+          <div class="panel-body"><div id="loanList" class="loan-list"></div><div id="listEmpty" class="empty hidden">还没有分期记录<br>点击右上角新增</div><div id="historyHead" class="history-head hidden">已结清贷款</div><div id="historyList" class="loan-list"></div></div>
+        </aside>
+        <section>
+          <div id="detailView" class="hidden">
+            <div class="summary" id="summary"></div>
+            <div class="panel">
+              <div class="panel-head"><div><h2 id="detailTitle"></h2><p class="subtitle" id="detailMeta"></p></div><div class="actions"><button class="btn" id="editBtn">编辑</button><button class="btn" id="closeLoanBtn">提前结清</button><button class="btn danger" id="deleteBtn">删除</button></div></div>
+              <div class="panel-body"><div class="table-wrap"><table><thead><tr><th>期数 / 状态</th><th>还款日</th><th>本期应还</th><th>本金</th><th>利息/手续费</th><th>剩余本金</th><th>实际还款</th></tr></thead><tbody id="scheduleBody"></tbody></table></div><div class="notice">计划金额用于估算，实际还款可逐期记录。提前结清会将贷款标记为已结清；如需精确处理部分提前还款，建议以银行结算单为准。</div></div>
+            </div>
+            <div class="panel bill-panel"><div class="panel-head"><div><h2>总账单</h2><p class="subtitle">按还款时间分行显示需还本金、利息和合计金额</p></div></div><div class="panel-body"><div class="table-wrap"><table><thead><tr><th>还款时间</th><th>需还本金</th><th>需还利息/手续费</th><th>本期合计</th><th>状态</th></tr></thead><tbody id="billBody"></tbody></table></div></div></div>
+          </div>
+          <div id="emptyView" class="panel"><div class="panel-body empty" style="padding:70px 20px"><h2 style="color:var(--ink);margin-bottom:8px">开始建立分期台账</h2><p>输入贷款或信用卡分期信息，系统会生成完整的还款计划。</p><button class="btn primary" id="emptyNewBtn" style="margin-top:18px">＋ 新增第一笔分期</button></div></div>
+          <div id="formView" class="panel hidden"><div class="panel-head"><h2 id="formTitle">新增分期</h2></div><div class="panel-body"><form id="loanForm"><div class="form-grid">
+            <div class="field full"><label for="name">名称</label><input id="name" required placeholder="例如：京东白条、招商银行消费贷"></div>
+            <div class="field"><label for="type">还款方式</label><select id="type"><option value="annuity">等额本息</option><option value="principal">等额本金</option><option value="card">信用卡固定手续费</option></select></div>
+            <div class="field"><label for="startDate">贷款开始日期</label><input id="startDate" type="date" required></div>
+            <div class="field"><label for="firstDueDate">首期还款日期</label><input id="firstDueDate" type="date" required></div>
+            <div class="field"><label for="principal">分期总额（元）</label><input id="principal" type="number" min="0.01" step="0.01" required placeholder="10000"></div>
+            <div class="field"><label for="interestMode">利息输入方式</label><select id="interestMode"><option value="annual">填写年利率</option><option value="total">填写利息总额</option></select></div>
+            <div class="field"><label id="rateLabel" for="rate">年利率（%）</label><input id="rate" type="number" min="0" step="0.001" required placeholder="例如：4.5"></div>
+            <div class="field"><label for="interestTotal">利息总额（元）</label><input id="interestTotal" type="number" min="0" step="0.01" placeholder="自动换算，可手动填写"></div>
+            <div class="field"><label for="periods">分期期数</label><input id="periods" type="number" min="1" max="360" step="1" required placeholder="12"></div>
+            <div class="field"><label for="paidPeriods">已还期数（按首期日期自动计算）</label><input id="paidPeriods" type="number" min="0" step="1" value="0" required></div>
+          </div><p class="help" id="rateHelp" style="margin-top:10px">输入年利率后自动计算利息总额；选择利息总额后会反算等效年利率。首期还款日期会根据当前日期自动推算已还期数，也可以手动修正。</p><div class="form-actions"><button type="button" class="btn" id="cancelBtn">取消</button><button type="submit" class="btn primary">保存并生成计划</button></div></form></div></div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script>
+    const CACHE_NS = 'bookkeeping-cache-v2';
+    const API_URL = location.protocol === 'file:' ? '' : '/api/loans';
+    const ADMIN_URL = location.protocol === 'file:' ? '' : '/api/admin/users';
+    let currentUser = API_URL ? null : { id: 'local', username: '本地', role: 'local' };
+    let currentCacheKey = cacheKeyFor(currentUser);
+    let loans = loadCache(currentCacheKey);
+    let selectedId = pickInitialLoan(loans);
+    let selectedMonth = new Date().toISOString().slice(0, 7);
+    let editingId = null;
+    let paidPeriodsTouched = false;
+    let adminVisible = false;
+    let adminUsers = [];
+    const $ = id => document.getElementById(id);
+    const money = n => Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const dateText = d => new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d).replaceAll('/', '-');
+    const addMonths = (iso, count) => { const d = new Date(iso + 'T12:00:00'); const day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + count); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, last)); return d; };
+
+    function normalizeLoan(l) {
+      const loan = { ...l, payments: l.payments && typeof l.payments === 'object' ? l.payments : {} };
+      const first = loan.firstDueDate || loan.startDate;
+      if (!loan.firstDueDate && first) loan.firstDueDate = first;
+      if (loan.rate === null || loan.rate === undefined) loan.rate = '';
+      if (loan.totalInterest === null || loan.totalInterest === undefined) loan.totalInterest = '';
+      if (!loan.paidPeriodsManual && !loan.closedAt && !Object.keys(loan.payments || {}).length && first) {
+        loan.paidPeriods = Math.min(monthsDue(first), Number(loan.periods) || 0);
+      }
+      return loan;
+    }
+
+    function loadCache(key) {
+      try {
+        const data = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(data) ? data.map(normalizeLoan) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveCache() {
+      localStorage.setItem(currentCacheKey, JSON.stringify(loans));
+    }
+
+    function cacheKeyFor(user) {
+      const token = user?.id || user?.username || 'guest';
+      return `${CACHE_NS}:${token}`;
+    }
+
+    function pickInitialLoan(list) {
+      return list.find(x => Number(x.paidPeriods) < Number(x.periods))?.id || list[0]?.id || null;
+    }
+
+    function setCurrentUser(user) {
+      currentUser = user || null;
+      if (currentUser) currentCacheKey = cacheKeyFor(currentUser);
+      loans = loadCache(currentCacheKey);
+      selectedId = pickInitialLoan(loans);
+      $('userName').textContent = currentUser?.username ? `已登录：${currentUser.username}` : '';
+      $('manageUsersBtn').classList.toggle('hidden', !(API_URL && currentUser?.role === 'admin'));
+      $('adminPanel').classList.toggle('hidden', !(API_URL && currentUser?.role === 'admin' && adminVisible));
+    }
+
+    async function persist() {
+      saveCache();
+      if (!API_URL || !currentUser) return;
+      try {
+        const res = await fetch(API_URL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(loans) });
+        if (res.status === 401) { showAuth(); return; }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (err) {
+        console.warn('服务器保存失败，已保留本机缓存', err);
+      }
+    }
+
+    async function syncFromServer() {
+      if (!API_URL) return;
+      try {
+        const auth = await fetch('/api/auth/status', { cache: 'no-store' });
+        const authData = await auth.json();
+        if (!authData.authenticated) {
+          adminVisible = false;
+          setCurrentUser(null);
+          showAuth();
+          return;
+        }
+        setCurrentUser(authData.user);
+        const res = await fetch(API_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const remote = await res.json();
+        if (!Array.isArray(remote)) throw new Error('服务器返回格式不正确');
+        if (remote.length === 0 && loans.length > 0) {
+          await persist();
+          return;
+        }
+        loans = remote.map(normalizeLoan);
+        selectedId = pickInitialLoan(loans);
+        saveCache();
+        render();
+        if (isAdmin()) await loadUsers();
+      } catch (err) {
+        console.warn('服务器读取失败，使用本机缓存', err);
+      }
+    }
+
+    function showAuth() {
+      $('authScreen').classList.remove('hidden');
+      document.querySelector('.app').classList.add('hidden');
+    }
+
+    function showApp(user) {
+      if (user) setCurrentUser(user);
+      $('authScreen').classList.add('hidden');
+      document.querySelector('.app').classList.remove('hidden');
+      renderAdminPanel();
+      render();
+    }
+
+    function showLocalApp() {
+      $('authScreen').classList.add('hidden');
+      document.querySelector('.app').classList.remove('hidden');
+      renderAdminPanel();
+      render();
+    }
+
+    function isAdmin() {
+      return Boolean(API_URL && currentUser?.role === 'admin');
+    }
+
+    function uid() {
+      return crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+    }
+
+    function isClosed(loan) {
+      return Number(loan.paidPeriods) >= Number(loan.periods) || Object.keys(loan.payments || {}).length >= Number(loan.periods);
+    }
+
+    function monthKey(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function calc(loan) {
+      const P = Number(loan.principal), n = Number(loan.periods), r = Number(loan.rate) / 100 / 12, rows = [];
+      const firstDate = loan.firstDueDate || loan.startDate;
+      let balance = P;
+      const payment = loan.type === 'annuity' ? (r === 0 ? P / n : P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1)) : 0;
+      const fixedFee = loan.type === 'card' ? P * Number(loan.rate) / 100 : 0;
+      for (let i = 1; i <= n; i++) {
+        let interest, principal, amount;
+        if (loan.type === 'principal') {
+          principal = P / n;
+          interest = balance * r;
+          amount = principal + interest;
+        } else if (loan.type === 'card') {
+          principal = P / n;
+          interest = fixedFee / n;
+          amount = principal + interest;
+        } else {
+          interest = balance * r;
+          principal = (i === n ? balance : payment - interest);
+          amount = (i === n ? principal + interest : payment);
+        }
+        balance = Math.max(0, balance - principal);
+        const actual = loan.payments?.[i] || null;
+        rows.push({ period: i, date: addMonths(firstDate, i - 1), amount, principal, interest, balance, paid: i <= Number(loan.paidPeriods) || Boolean(actual), actual });
+      }
+      return rows;
+    }
+
+    function loanButton(l) {
+      const closed = isClosed(l);
+      return `<button class="loan-item ${l.id === selectedId ? 'active' : ''}" data-id="${l.id}"><div class="loan-item-title"><span>${esc(l.name)}</span><span>${closed ? '<span class="closed-badge">已结清</span>' : `${Number(l.paidPeriods)}/${Number(l.periods)}期`}</span></div><div class="loan-item-meta">${closed ? '已完成全部还款' : '剩余本金 ¥' + money(calc(l).find(r => !r.paid)?.balance ?? 0)}</div></button>`;
+    }
+
+    function render() {
+      const active = loans.filter(l => !isClosed(l));
+      const history = loans.filter(isClosed);
+      $('loanCount').textContent = loans.length ? `${active.length} 笔进行中 · ${history.length} 笔已结清` : '';
+      $('loanList').innerHTML = active.map(loanButton).join('');
+      $('historyList').innerHTML = history.map(loanButton).join('');
+      $('listEmpty').classList.toggle('hidden', loans.length > 0);
+      $('historyHead').classList.toggle('hidden', history.length === 0);
+      $('detailView').classList.toggle('hidden', !selectedId || !loans.length);
+      $('emptyView').classList.toggle('hidden', Boolean(selectedId && loans.length));
+      if (selectedId && loans.length) renderDetail();
+      document.querySelectorAll('.loan-item').forEach(b => b.onclick = () => { selectedId = b.dataset.id; render(); });
+      renderMonth();
+      renderAdminPanel();
+    }
+
+    function renderMonth() {
+      const active = loans.filter(l => !isClosed(l));
+      const options = new Set([monthKey(new Date())]);
+      active.forEach(l => calc(l).filter(r => !r.paid).forEach(r => options.add(monthKey(r.date))));
+      const sorted = [...options].sort();
+      if (!sorted.includes(selectedMonth)) selectedMonth = sorted[0] || monthKey(new Date());
+      $('monthSelect').innerHTML = sorted.map(m => `<option value="${m}" ${m === selectedMonth ? 'selected' : ''}>${m.slice(0, 4)}年${Number(m.slice(5))}月</option>`).join('');
+      const items = [];
+      active.forEach(l => calc(l).filter(r => !r.paid && monthKey(r.date) === selectedMonth).forEach(r => items.push({ loan: l, row: r })));
+      items.sort((a, b) => a.row.date - b.row.date);
+      const principal = items.reduce((s, x) => s + x.row.principal, 0);
+      const interest = items.reduce((s, x) => s + x.row.interest, 0);
+      const total = principal + interest;
+      $('monthSummary').innerHTML = `<div class="metric"><div class="metric-label">本月应还</div><div class="metric-value">¥${money(total)}</div><div class="month-detail">${items.length} 笔待还账单</div></div><div class="metric"><div class="metric-label">本月应还本金</div><div class="metric-value">¥${money(principal)}</div></div><div class="metric"><div class="metric-label">本月利息/手续费</div><div class="metric-value">¥${money(interest)}</div></div><div class="metric"><div class="metric-label">还款日数量</div><div class="metric-value">${new Set(items.map(x => dateText(x.row.date))).size} 天</div></div>`;
+      const allItems = [];
+      active.forEach(l => calc(l).filter(r => !r.paid).forEach(r => allItems.push({ loan: l, row: r })));
+      const allPrincipal = allItems.reduce((s, x) => s + x.row.principal, 0);
+      const allInterest = allItems.reduce((s, x) => s + x.row.interest, 0);
+      $('overallSummary').innerHTML = `<div class="metric"><div class="metric-label">应还总本金</div><div class="metric-value">¥${money(allPrincipal)}</div><div class="month-detail">所有未结清贷款合计</div></div><div class="metric"><div class="metric-label">应还总利息/手续费</div><div class="metric-value">¥${money(allInterest)}</div><div class="month-detail">所有未结清贷款合计</div></div>`;
+      const byDay = new Map();
+      items.forEach(x => {
+        const key = dateText(x.row.date);
+        const v = byDay.get(key) || { date: x.row.date, count: 0, principal: 0, interest: 0, total: 0 };
+        v.count++;
+        v.principal += x.row.principal;
+        v.interest += x.row.interest;
+        v.total += x.row.amount;
+        byDay.set(key, v);
+      });
+      $('dayBody').innerHTML = [...byDay.values()].sort((a, b) => a.date - b.date).map(v => `<tr><td>${dateText(v.date)}</td><td>${v.count} 笔</td><td>¥${money(v.principal)}</td><td>¥${money(v.interest)}</td><td class="bill-total">¥${money(v.total)}</td></tr>`).join('');
+      $('monthBody').innerHTML = items.map(x => `<tr><td>${esc(x.loan.name)}</td><td>${dateText(x.row.date)}</td><td>¥${money(x.row.principal)}</td><td>¥${money(x.row.interest)}</td><td class="bill-total">¥${money(x.row.amount)}</td></tr>`).join('');
+      $('monthEmpty').classList.toggle('hidden', items.length > 0);
+    }
+
+    function renderDetail() {
+      const l = loans.find(x => x.id === selectedId);
+      if (!l) return;
+      const rows = calc(l);
+      const paidRows = rows.filter(r => r.paid);
+      const paid = paidRows.length;
+      const current = paidRows[paidRows.length - 1];
+      const next = rows.find(r => !r.paid);
+      const remainingPrincipal = current ? current.balance : l.principal;
+      const remainingInterest = rows.filter(r => !r.paid).reduce((s, r) => s + r.interest, 0);
+      const progress = rows.length ? paid / rows.length * 100 : 0;
+      $('detailTitle').textContent = l.name;
+      $('detailMeta').textContent = `${typeName(l.type)} · 开始 ${l.startDate || l.firstDueDate} · 首期还款 ${l.firstDueDate || l.startDate} · ${l.periods} 期`;
+      $('summary').innerHTML = `<div class="metric"><div class="metric-label">剩余本金</div><div class="metric-value">¥${money(remainingPrincipal)}</div><div class="metric-note">原始 ¥${money(l.principal)}</div></div><div class="metric"><div class="metric-label">剩余利息/手续费</div><div class="metric-value">¥${money(remainingInterest)}</div><div class="metric-note">已还 ¥${money(rows.slice(0, paid).reduce((s, r) => s + r.interest, 0))}</div></div><div class="metric"><div class="metric-label">下期应还</div><div class="metric-value">${next ? '¥' + money(next.amount) : '已结清'}</div><div class="metric-note">${next ? dateText(next.date) : '全部完成'}</div></div><div class="metric"><div class="metric-label">还款进度</div><div class="metric-value">${paid}/${rows.length} 期</div><div class="progress"><span style="width:${progress}%"></span></div></div>`;
+      $('scheduleBody').innerHTML = rows.map(r => `<tr class="${r.paid ? 'paid' : ''}"><td><span class="status ${r.paid ? 'paid' : r.period === paid + 1 ? 'next' : 'future'}"><span class="dot"></span>第${r.period}期 · ${r.paid ? '已还' : r.period === paid + 1 ? '下期' : '待还'}</span></td><td>${dateText(r.date)}</td><td>¥${money(r.amount)}</td><td>¥${money(r.principal)}</td><td>¥${money(r.interest)}</td><td>¥${money(r.balance)}</td><td>${r.actual ? `${dateText(new Date(r.actual.date + 'T12:00:00'))} / ¥${money(r.actual.amount)}` : r.paid ? '按计划已还' : `<button class="btn mark-paid" data-period="${r.period}">记录</button>`}</td></tr>`).join('');
+      $('billBody').innerHTML = rows.map(r => `<tr class="${r.paid ? 'paid' : ''}"><td>${dateText(r.date)}</td><td>¥${money(r.principal)}</td><td>¥${money(r.interest)}</td><td class="bill-total">¥${money(r.amount)}</td><td><span class="status ${r.paid ? 'paid' : r.period === paid + 1 ? 'next' : 'future'}"><span class="dot"></span>${r.paid ? '已还' : r.period === paid + 1 ? '下期' : '待还'}</span></td></tr>`).join('');
+      document.querySelectorAll('.mark-paid').forEach(b => b.onclick = () => markPaid(Number(b.dataset.period)));
+    }
+
+    function typeName(t) {
+      return t === 'annuity' ? '等额本息' : t === 'principal' ? '等额本金' : '信用卡固定手续费';
+    }
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+    }
+
+    function monthsDue(start) {
+      if (!start) return 0;
+      const now = new Date();
+      now.setHours(23, 59, 59, 999);
+      const d = new Date(start + 'T00:00:00');
+      if (now < d) return 0;
+      let m = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+      if (now.getDate() <= d.getDate()) m--;
+      return Math.max(0, m + 1);
+    }
+
+    function annualForTotal(P, n, total, type) {
+      total = Number(total) || 0;
+      if (!P || !n) return 0;
+      if (type === 'card') return total / P * 100;
+      if (type === 'principal') return total / (P * (n + 1) / 2) * 12 * 100;
+      let lo = 0, hi = 100, target = total;
+      for (let i = 0; i < 80; i++) {
+        const mid = (lo + hi) / 2, r = mid / 100 / 12, payment = r === 0 ? P / n : P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1), ti = payment * n - P;
+        if (ti < target) lo = mid; else hi = mid;
+      }
+      return (lo + hi) / 2;
+    }
+
+    function totalForAnnual(P, n, annual, type) {
+      if (!P || !n) return 0;
+      if (type === 'card') return P * Number(annual) / 100;
+      const r = Number(annual) / 100 / 12;
+      if (type === 'principal') return P * (n + 1) / 2 * r;
+      if (r === 0) return 0;
+      const payment = P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+      return payment * n - P;
+    }
+
+    function syncInterestFields(source) {
+      const type = $('type').value, P = Number($('principal').value), n = Number($('periods').value);
+      if (source === 'total') {
+        const t = Number($('interestTotal').value) || 0;
+        $('rate').value = annualForTotal(P, n, t, type).toFixed(3);
+      } else {
+        const t = totalForAnnual(P, n, Number($('rate').value) || 0, type);
+        $('interestTotal').value = t.toFixed(2);
+      }
+    }
+
+    function openForm(id = null) {
+      editingId = id;
+      paidPeriodsTouched = false;
+      $('formView').classList.remove('hidden');
+      $('detailView').classList.add('hidden');
+      $('emptyView').classList.add('hidden');
+      const l = id ? loans.find(x => x.id === id) : null;
+      $('formTitle').textContent = l ? '编辑分期' : '新增分期';
+      $('name').value = l?.name || '';
+      $('type').value = l?.type || 'annuity';
+      $('startDate').value = l?.startDate || new Date().toISOString().slice(0, 10);
+      $('firstDueDate').value = l?.firstDueDate || l?.startDate || new Date().toISOString().slice(0, 10);
+      $('principal').value = l?.principal || '';
+      $('rate').value = l?.rate ?? '';
+      $('interestTotal').value = l?.totalInterest ?? totalForAnnual(Number(l?.principal) || 0, Number(l?.periods) || 0, Number(l?.rate) || 0, l?.type || 'annuity').toFixed(2);
+      $('interestMode').value = 'annual';
+      $('periods').value = l?.periods || '';
+      $('paidPeriods').value = l?.paidPeriods ?? Math.min(monthsDue($('firstDueDate').value), Number(l?.periods) || 0);
+      updateRateHelp();
+      setInterestMode();
+    }
+
+    function closeForm() {
+      $('formView').classList.add('hidden');
+      $('detailView').classList.toggle('hidden', !selectedId);
+      $('emptyView').classList.toggle('hidden', Boolean(selectedId));
+    }
+
+    function updateRateHelp() {
+      const card = $('type').value === 'card';
+      $('rateLabel').textContent = card ? '手续费率（%）/等效年利率' : '年利率（%）';
+      $('rateHelp').textContent = card ? '信用卡模式中该百分比代表总手续费率；输入总利息会自动换算手续费率。' : '输入年利率会自动计算利息总额；切换为“填写利息总额”后会反算等效年利率。';
+    }
+
+    function setInterestMode() {
+      const total = $('interestMode').value === 'total';
+      $('interestTotal').disabled = !total;
+      $('rate').disabled = total;
+      updateRateHelp();
+    }
+
+    function markPaid(period) {
+      const l = loans.find(x => x.id === selectedId);
+      if (!l) return;
+      const amount = prompt(`第${period}期实际还款金额（元）`, money(calc(l)[period - 1].amount));
+      if (amount === null) return;
+      const actualDate = prompt('实际还款日期（YYYY-MM-DD）', new Date().toISOString().slice(0, 10));
+      if (!actualDate) return;
+      const n = Number(String(amount).replace(/,/g, ''));
+      if (!Number.isFinite(n) || n < 0) { alert('请输入有效金额'); return; }
+      l.payments = l.payments || {};
+      l.payments[period] = { amount: n, date: actualDate };
+      persist();
+      render();
+    }
+
+    function closeLoan() {
+      const l = loans.find(x => x.id === selectedId);
+      if (!l || isClosed(l)) return;
+      if (!confirm(`确定将“${l.name}”标记为提前结清吗？`)) return;
+      l.paidPeriods = Number(l.periods);
+      l.closedAt = new Date().toISOString().slice(0, 10);
+      persist();
+      render();
+    }
+
+    async function loadUsers() {
+      if (!isAdmin()) return;
+      try {
+        const res = await fetch(ADMIN_URL, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        adminUsers = Array.isArray(data.users) ? data.users : [];
+        renderUsers();
+      } catch (err) {
+        console.warn('加载用户失败', err);
+      }
+    }
+
+    function renderUsers() {
+      if (!isAdmin()) return;
+      $('userBody').innerHTML = adminUsers.map(u => `
+        <tr>
+          <td>${esc(u.username)}</td>
+          <td>${u.role === 'admin' ? '管理员' : '普通用户'}</td>
+          <td>${u.disabled ? '停用' : '启用'}</td>
+          <td>${u.loan_count || 0}</td>
+          <td>${u.created_at || ''}</td>
+          <td>
+            <div class="inline-actions">
+              <button class="btn sm" data-user-action="password" data-id="${u.id}">重置密码</button>
+              <button class="btn sm" data-user-action="toggle" data-id="${u.id}">${u.disabled ? '启用' : '停用'}</button>
+              <button class="btn sm danger" data-user-action="delete" data-id="${u.id}">删除</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      $('userEmpty').classList.toggle('hidden', adminUsers.length > 0);
+      document.querySelectorAll('[data-user-action]').forEach(btn => btn.onclick = () => handleUserAction(btn.dataset.userAction, Number(btn.dataset.id)));
+    }
+
+    async function handleUserAction(action, userId) {
+      const user = adminUsers.find(x => Number(x.id) === Number(userId));
+      if (!user) return;
+      try {
+        if (action === 'password') {
+          const password = prompt(`为 ${user.username} 设置新密码`, '');
+          if (password === null) return;
+          const res = await fetch(`${ADMIN_URL}/${userId}/password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '重置失败');
+          alert('密码已重置');
+        } else if (action === 'toggle') {
+          const res = await fetch(`${ADMIN_URL}/${userId}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ disabled: !user.disabled }) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '状态更新失败');
+        } else if (action === 'delete') {
+          if (!confirm(`确定删除用户 ${user.username} 吗？`)) return;
+          const res = await fetch(`${ADMIN_URL}/${userId}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '删除失败');
+        }
+        await loadUsers();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function renderAdminPanel() {
+      const visible = isAdmin() && adminVisible;
+      $('adminPanel').classList.toggle('hidden', !visible);
+      $('manageUsersBtn').classList.toggle('hidden', !isAdmin());
+    }
+
+    function userMenuToggle() {
+      adminVisible = !adminVisible;
+      renderAdminPanel();
+      if (adminVisible) loadUsers();
+    }
+
+    $('newBtn').onclick = () => openForm();
+    $('emptyNewBtn').onclick = () => openForm();
+    $('cancelBtn').onclick = closeForm;
+    $('editBtn').onclick = () => openForm(selectedId);
+    $('closeLoanBtn').onclick = closeLoan;
+    $('type').onchange = () => { updateRateHelp(); syncInterestFields($('interestMode').value === 'total' ? 'total' : 'annual'); };
+    $('interestMode').onchange = () => { setInterestMode(); };
+    $('rate').oninput = () => { if ($('interestMode').value === 'annual') syncInterestFields('annual'); };
+    $('interestTotal').oninput = () => { if ($('interestMode').value === 'total') syncInterestFields('total'); };
+    ['principal', 'periods'].forEach(id => $(id).oninput = () => { syncInterestFields($('interestMode').value === 'total' ? 'total' : 'annual'); if (id === 'periods') $('paidPeriods').value = Math.min(monthsDue($('firstDueDate').value), Number($('periods').value) || 0); });
+    $('paidPeriods').oninput = () => { paidPeriodsTouched = true; };
+    $('startDate').onchange = () => { if (!$('firstDueDate').value) $('firstDueDate').value = $('startDate').value; };
+    $('firstDueDate').onchange = () => { $('paidPeriods').value = Math.min(monthsDue($('firstDueDate').value), Number($('periods').value) || 0); paidPeriodsTouched = false; };
+    $('monthSelect').onchange = () => { selectedMonth = $('monthSelect').value; renderMonth(); };
+    $('loanForm').onsubmit = e => {
+      e.preventDefault();
+      const old = editingId ? loans.find(x => x.id === editingId) : null;
+      const data = {
+        id: editingId || uid(),
+        name: $('name').value.trim(),
+        type: $('type').value,
+        startDate: $('startDate').value,
+        firstDueDate: $('firstDueDate').value || $('startDate').value,
+        principal: Number($('principal').value),
+        rate: Number($('rate').value),
+        totalInterest: Number($('interestTotal').value) || 0,
+        periods: Number($('periods').value),
+        paidPeriods: Number($('paidPeriods').value),
+        paidPeriodsManual: Boolean(old?.paidPeriodsManual || paidPeriodsTouched),
+        payments: old?.payments || {}
+      };
+      if (data.paidPeriods > data.periods) { alert('已还期数不能超过总期数'); return; }
+      const i = loans.findIndex(x => x.id === data.id);
+      if (i >= 0) loans[i] = normalizeLoan(data); else loans.unshift(normalizeLoan(data));
+      selectedId = data.id;
+      persist();
+      closeForm();
+      render();
+    };
+    $('deleteBtn').onclick = () => {
+      const l = loans.find(x => x.id === selectedId);
+      if (l && !confirm(`确定删除“${l.name}”吗？`)) return;
+      loans = loans.filter(x => x.id !== selectedId);
+      selectedId = loans[0]?.id || null;
+      persist();
+      render();
+    };
+    $('exportBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify(loans, null, 2)], { type: 'application/json' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '分期台账.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    $('loginForm').onsubmit = async e => {
+      e.preventDefault();
+      $('authError').textContent = '';
+      try {
+        const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('loginUsername').value, password: $('loginPassword').value }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '登录失败');
+        showApp(data.user);
+        await syncFromServer();
+      } catch (err) {
+        $('authError').textContent = err.message;
+      }
+    };
+    $('logoutBtn').onclick = async () => {
+      if (API_URL) await fetch('/api/auth/logout', { method: 'POST' });
+      adminVisible = false;
+      if (API_URL) {
+        setCurrentUser(null);
+        showAuth();
+      } else {
+        showLocalApp();
+      }
+      $('loginPassword').value = '';
+    };
+    $('manageUsersBtn').onclick = userMenuToggle;
+    $('refreshUsersBtn').onclick = loadUsers;
+    $('userForm').onsubmit = async e => {
+      e.preventDefault();
+      if (!isAdmin()) return;
+      try {
+        const body = { username: $('newUsername').value.trim(), password: $('newPassword').value, role: $('newRole').value };
+        const res = await fetch(ADMIN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '创建失败');
+        $('newPassword').value = '';
+        $('newUsername').focus();
+        await loadUsers();
+        alert(`已创建用户 ${data.user.username}`);
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+    $('importBtn').onclick = () => $('importFile').click();
+    $('importFile').onchange = async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (!Array.isArray(data) || data.some(x => !x.id || !x.name || !Number.isFinite(Number(x.principal)))) throw new Error('格式不正确');
+        if (!confirm('导入会替换当前记录，是否继续？')) return;
+        loans = data.map(normalizeLoan);
+        selectedId = pickInitialLoan(loans);
+        persist();
+        render();
+        alert(`已导入 ${loans.length} 笔记录`);
+      } catch (err) {
+        alert('导入失败：' + err.message);
+      }
+      e.target.value = '';
+    };
+
+    render();
+    if (API_URL) {
+      showAuth();
+      syncFromServer();
+    } else {
+      showLocalApp();
+    }
+  </script>
+</body>
+</html>
